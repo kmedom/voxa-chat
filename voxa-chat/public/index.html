@@ -1,723 +1,210 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>voxa 隱密聊天室 - 安全匿名聊天</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet">
-  <style>
-    /* Global Styles */
-    * { box-sizing: border-box; margin: 0; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #2f2b3f;
-      color: #e0e0e0;
-      font-size: 16px;
-    }
-    .rounded { border-radius: 6px; }
-    .btn {
-      padding: 10px 20px;
-      font-size: 1rem;
-      background-color: #5e548e;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn:hover {
-      background-color: #4b4377;
-      transform: scale(1.05);
-    }
-    .btn:disabled {
-      background-color: #3b364f;
-      cursor: not-allowed;
-      transform: none;
-    }
+     <html lang="en">
+     <head>
+       <meta charset="UTF-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+       <title>voxa</title>
+       <style>
+         body {
+           font-family: Arial, sans-serif;
+           background-color: #f0f2f5;
+           margin: 0;
+           padding: 20px;
+           display: flex;
+           justify-content: center;
+         }
+         .container {
+           max-width: 600px;
+           width: 100%;
+           background: white;
+           border-radius: 6px;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+           padding: 20px;
+         }
+         h1 {
+           font-size: 24px;
+           color: #333;
+           margin: 0 0 20px;
+           text-align: center;
+         }
+         .input-group {
+           margin-bottom: 15px;
+         }
+         input {
+           width: 100%;
+           padding: 10px;
+           border: 1px solid #ddd;
+           border-radius: 6px;
+           font-size: 16px;
+           box-sizing: border-box;
+         }
+         button {
+           width: 100%;
+           padding: 12px;
+           background: #5e548e;
+           color: white;
+           border: none;
+           border-radius: 6px;
+           font-size: 16px;
+           cursor: pointer;
+           margin-top: 10px;
+         }
+         button:hover {
+           background: #483d8b;
+         }
+         .message {
+           padding: 10px;
+           margin: 5px 0;
+           border-radius: 6px;
+         }
+         .message.self {
+           background: #e1f5fe;
+           margin-left: 20%;
+         }
+         .message.other {
+           background: #f5f5f5;
+           margin-right: 20%;
+         }
+         .error {
+           color: red;
+           text-align: center;
+           margin: 10px 0;
+         }
+         .share-link {
+           margin-top: 10px;
+           text-align: center;
+         }
+         .share-link a {
+           color: #5e548e;
+           text-decoration: none;
+         }
+         @media (max-width: 600px) {
+           button {
+             font-size: 36px;
+             padding: 15px;
+           }
+         }
+       </style>
+     </head>
+     <body>
+       <div class="container">
+         <h1 id="room-title">voxa</h1>
+         <div id="join-room">
+           <div class="input-group">
+             <input id="room-id" type="text" placeholder="Room ID (optional)">
+           </div>
+           <div class="input-group">
+             <input id="key" type="text" placeholder="Enter key">
+           </div>
+           <button onclick="Chat.joinRoom()">進入聊天</button>
+         </div>
+         <div id="chat" style="display: none;">
+           <div id="messages"></div>
+           <div class="input-group">
+             <input id="message-input" type="text" placeholder="Type a message">
+           </div>
+           <button onclick="Chat.sendMessage()">傳送</button>
+           <div class="share-link">
+             <a id="share-link" href="#">分享連結</a>
+           </div>
+         </div>
+         <div id="error" class="error"></div>
+       </div>
 
-    /* Homepage */
-    #brand-logo {
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%) skewX(-5deg);
-      font-size: 6rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      color: #d1c4e9;
-      transition: color 0.2s;
-      user-select: none;
-    }
-    #brand-logo:hover { color: #e6d8ff; }
-    .start-btn {
-      font-size: 3rem;
-      width: 80px;
-      height: 80px;
-      line-height: 80px;
-      text-align: center;
-      background-color: #6b5b95;
-      color: white;
-      border-radius: 50%;
-      cursor: pointer;
-      transition: all 0.2s;
-      user-select: none;
-    }
-    .start-btn:hover {
-      background-color: #5e548e;
-      transform: scale(1.1);
-    }
+       <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+       <script>
+         const Chat = {
+           CONFIG: {
+             CONNECT_TIMEOUT: 10000
+           },
+           state: {
+             socket: null,
+             roomId: null,
+             key: null
+           },
 
-    /* Modal Window */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .modal.show {
-      display: flex;
-      opacity: 1;
-    }
-    .modal-content {
-      background-color: #3b364f;
-      padding: 20px;
-      border-radius: 10px;
-      width: 90%;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    .modal-content h2 {
-      margin: 0 0 16px;
-      color: #d1c4e9;
-      font-size: 1.2rem;
-    }
-    .modal-content input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 16px;
-      font-size: 0.9rem;
-      border: 1px solid #5e548e;
-      border-radius: 6px;
-      background-color: #484063;
-      color: #e0e0e0;
-      outline: none;
-      height: 34px;
-    }
-    .modal-content input::placeholder { color: #b0a4d8; }
-    #secretKey {
-      width: 70%;
-      padding: 8px;
-      font-size: 0.9rem;
-    }
-    #generate-key-btn {
-      padding: 4px 6px;
-      font-size: 0.7rem;
-      margin-left: 8px;
-      height: 34px;
-    }
+           initSocket() {
+             Chat.state.socket = io('https://voxa-backend.onrender.com', {
+               timeout: Chat.CONFIG.CONNECT_TIMEOUT
+             });
 
-    /* Chat Room */
-    .chat-container {
-      display: none;
-      width: 800px;
-      margin: 20px auto;
-      background: #3b364f;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      padding: 20px;
-    }
-    .chat-container h1 {
-      font-size: 1.5rem;
-      text-align: center;
-      margin: 0 0 16px;
-      color: #d1c4e9;
-    }
-    #share-link {
-      margin: 0 0 16px;
-      padding: 10px;
-      background-color: #484063;
-      color: #b0a4d8;
-      word-break: break-all;
-      font-size: 0.9rem;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-    }
-    #share-link a { color: #b0a4d8; }
-    #share-link button {
-      padding: 5px 10px;
-      font-size: 0.8rem;
-      height: 34px;
-    }
-    #leave-room { background-color: #f39c12; }
-    #leave-room:hover { background-color: #e08e0b; transform: scale(1.05); }
-    #close-room { background-color: #e74c3c; }
-    #close-room:hover { background-color: #c0392b; transform: scale(1.05); }
-    #chat {
-      width: 100%;
-      height: calc(100vh - 260px);
-      max-height: 600px;
-      border: 1px solid #5e548e;
-      padding: 10px;
-      overflow-y: auto;
-      margin-bottom: 16px;
-      background-color: #403a5c;
-    }
-    #chat p {
-      margin: 5px 0;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    #chat p span.time {
-      font-size: 0.8rem;
-      color: #b0a4d8;
-      margin-left: 10px;
-      flex-shrink: 0;
-    }
-    #chat p.you { background-color: #6b5b95; text-align: right; }
-    #chat p.other { background-color: #5e548e; }
-    #chat p.system { color: #b0a4d8; font-style: italic; text-align: center; }
-    #typing-indicator {
-      font-size: 0.8rem;
-      color: #b0a4d8;
-      margin-bottom: 10px;
-      text-align: center;
-      display: none;
-    }
-    .message-input {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-    .message-input input {
-      flex: 1;
-      padding: 8px;
-      font-size: 0.9rem;
-      border: 1px solid #5e548e;
-      border-radius: 6px;
-      background-color: #484063;
-      color: #e0e0e0;
-      outline: none;
-      height: 34px;
-    }
-    .message-input input::placeholder { color: #b0a4d8; }
-    .message-input button {
-      padding: 8px 24px;
-      height: 34px;
-    }
+             Chat.state.socket.on('connect_error', () => {
+               Chat.showError('無法連線到伺服器');
+             });
 
-    /* Alerts */
-    .alert {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #ff4d4d;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 6px;
-      z-index: 1000;
-      font-size: 0.9rem;
-    }
-    .alert.success { background-color: #28a745; }
+             Chat.state.socket.on('room-update', ({ roomId, title }) => {
+               document.getElementById('room-title').textContent = title;
+               Chat.state.roomId = roomId;
+               Chat.updateShareLink();
+             });
 
-    /* Responsive */
-    @media (max-width: 850px) {
-      body { font-size: 14px; }
-      #brand-logo { font-size: 4rem; top: 15%; }
-      .chat-container { width: 100%; padding: 12px; }
-      .chat-container h1 { font-size: 1.2rem; }
-      .modal-content { padding: 12px; }
-      .start-btn { width: 60px; height: 60px; line-height: 60px; font-size: 2rem; }
-      #chat { height: calc(100vh - 300px); max-height: 400px; }
-      #chat p { font-size: 0.9rem; }
-      #chat p span.time { font-size: 0.7rem; }
-      #share-link { font-size: 0.8rem; }
-      .message-input input { font-size: 0.85rem; height: 36px; padding: 6px; }
-      .message-input button, #share-link button { padding: 6px 16px; font-size: 0.9rem; height: 36px; }
-      .modal-content input { padding: 6px; font-size: 0.85rem; height: 36px; }
-      .btn { font-size: 0.9rem; height: 36px; }
-      #secretKey { width: 65%; padding: 6px; font-size: 0.85rem; }
-      #generate-key-btn { padding: 3px 5px; font-size: 0.65rem; height: 36px; }
-    }
-  </style>
-</head>
-<body>
-  <h1 id="brand-logo">voxa</h1>
-  <div class="start-btn" id="startBtn" aria-label="開啟聊天室" tabindex="0">+</div>
+             Chat.state.socket.on('receive-message', ({ message, sender }) => {
+               Chat.addMessage(message, sender === Chat.state.socket.id);
+             });
+           },
 
-  <section class="modal" id="roomModal">
-    <div class="modal-content">
-      <h2>創建或加入房間</h2>
-      <input type="text" id="roomId" placeholder="房間 ID（留空隨機生成）" tabindex="1">
-      <div style="display: flex; align-items: center;">
-        <input type="text" id="secretKey" placeholder="加密密鑰（與對方共享）" tabindex="2">
-        <button id="generate-key-btn" class="btn" aria-label="生成隨機密鑰" tabindex="3">生成密鑰</button>
-      </div>
-      <button class="btn" id="joinRoomBtn" aria-label="進入聊天室" tabindex="4">進入聊天</button>
-    </div>
-  </section>
+           joinRoom() {
+             const roomId = document.getElementById('room-id').value || Math.random().toString(36).slice(2);
+             const key = document.getElementById('key').value;
+             if (!key) {
+               return Chat.showError('請輸入密鑰');
+             }
 
-  <section class="chat-container" id="chatContainer">
-    <h1 id="chatTitle">voxa room</h1>
-    <div id="share-link"></div>
-    <div id="typing-indicator">正在輸入...</div>
-    <div id="chat"></div>
-    <div class="message-input">
-      <input type="text" id="message" placeholder="輸入訊息..." tabindex="5">
-      <button class="btn" id="sendMessageBtn" aria-label="傳送訊息" tabindex="6">傳送</button>
-    </div>
-  </section>
+             Chat.state.key = key;
+             Chat.state.socket.emit('join-room', { roomId, key }, (response) => {
+               if (response.error) {
+                 Chat.showError('加入房間失敗：' + response.error);
+               } else {
+                 document.getElementById('join-room').style.display = 'none';
+                 document.getElementById('chat').style.display = 'block';
+                 Chat.updateShareLink();
+               }
+             });
+           },
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js" defer></script>
-  <script>
-    const Chat = {
-      CONFIG: {
-        KEY_LENGTH: 16,
-        MAX_MESSAGES: 100,
-        ROOM_ID_LENGTH: 8,
-        ALERT_TIMEOUT: 6000,
-        TYPING_TIMEOUT: 3000,
-        CONNECT_TIMEOUT: 10000,
-        MAX_RETRIES: 3
-      },
+           sendMessage() {
+             const input = document.getElementById('message-input');
+             const message = input.value.trim();
+             if (!message) return;
 
-      elements: {
-        brandLogo: document.getElementById('brand-logo'),
-        startBtn: document.getElementById('startBtn'),
-        roomModal: document.getElementById('roomModal'),
-        roomId: document.getElementById('roomId'),
-        secretKey: document.getElementById('secretKey'),
-        joinRoomBtn: document.getElementById('joinRoomBtn'),
-        chatContainer: document.getElementById('chatContainer'),
-        chatTitle: document.getElementById('chatTitle'),
-        shareLink: document.getElementById('share-link'),
-        typingIndicator: document.getElementById('typing-indicator'),
-        chat: document.getElementById('chat'),
-        message: document.getElementById('message'),
-        sendMessageBtn: document.getElementById('sendMessageBtn')
-      },
+             Chat.state.socket.emit('send-message', { message }, (response) => {
+               if (response.error) {
+                 Chat.showError(response.error);
+               } else {
+                 input.value = '';
+               }
+             });
+           },
 
-      state: {
-        socket: null,
-        currentRoom: '',
-        secretKey: '',
-        violationCount: 0,
-        typingTimeout: null,
-        connectRetries: 0
-      },
+           addMessage(message, isSelf) {
+             const messages = document.getElementById('messages');
+             const div = document.createElement('div');
+             div.className = `message ${isSelf ? 'self' : 'other'}`;
+             div.textContent = message;
+             messages.appendChild(div);
+             messages.scrollTop = messages.scrollHeight;
+           },
 
-      init() {
-        this.cacheDomEvents();
-        this.UI.init();
-        this.Socket.init();
-      },
+           showError(message) {
+             const errorDiv = document.getElementById('error');
+             errorDiv.textContent = message;
+             setTimeout(() => errorDiv.textContent = '', 3000);
+           },
 
-      cacheDomEvents() {
-        this.elements.startBtn.addEventListener('click', () => this.UI.showModal());
-        this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
-        this.elements.sendMessageBtn.addEventListener('click', () => this.sendMessage());
-        this.elements.roomId.addEventListener('keydown', e => this.handleEvent(e, 'modal'));
-        this.elements.secretKey.addEventListener('keydown', e => this.handleEvent(e, 'modal'));
-        this.elements.message.addEventListener('keydown', e => this.handleEvent(e, 'message'));
-        this.elements.message.addEventListener('input', () => this.handleTyping());
-        document.getElementById('generate-key-btn').addEventListener('click', () => this.Crypto.generateKey());
-        this.elements.roomModal.addEventListener('click', e => {
-          if (e.target === this.elements.roomModal) this.UI.hideModal();
-        });
-        window.addEventListener('beforeunload', () => this.Socket.cleanup());
-      },
+           updateShareLink() {
+             const link = document.getElementById('share-link');
+             const url = new URL(window.location.href);
+             url.searchParams.set('room', Chat.state.roomId);
+             link.href = url.toString();
+             link.textContent = '分享連結';
+           }
+         };
 
-      UI: {
-        init() {
-          const urlParams = new URLSearchParams(window.location.search);
-          const room = urlParams.get('room');
-          if (room) {
-            Chat.elements.roomId.value = room;
-            Chat.UI.showModal();
-          }
-        },
+         document.getElementById('message-input').addEventListener('keypress', (e) => {
+           if (e.key === 'Enter') Chat.sendMessage();
+         });
 
-        showModal() {
-          Chat.elements.roomId.value = '';
-          Chat.elements.secretKey.value = '';
-          Chat.elements.roomModal.classList.add('show');
-          Chat.elements.roomId.focus();
-        },
-
-        hideModal() {
-          Chat.elements.roomModal.classList.remove('show');
-          setTimeout(() => {
-            Chat.elements.roomModal.style.display = 'none';
-          }, 300);
-        },
-
-        showChat() {
-          Chat.elements.chatContainer.style.display = 'block';
-          Chat.elements.startBtn.style.display = 'none';
-          Chat.elements.brandLogo.style.display = 'none';
-        },
-
-        hideChat() {
-          Chat.elements.chatContainer.style.display = 'none';
-          Chat.elements.startBtn.style.display = 'block';
-          Chat.elements.brandLogo.style.display = 'block';
-        },
-
-        showAlert(message, type = 'error') {
-          const alert = document.createElement('div');
-          alert.className = `alert ${type}`;
-          alert.textContent = message;
-          document.body.appendChild(alert);
-          setTimeout(() => alert.remove(), Chat.CONFIG.ALERT_TIMEOUT);
-        },
-
-        appendMessage(text, type) {
-          const chat = Chat.elements.chat;
-          const messages = chat.getElementsByTagName('p');
-          if (messages.length >= Chat.CONFIG.MAX_MESSAGES) {
-            chat.removeChild(messages[0]);
-          }
-          const p = document.createElement('p');
-          p.className = type;
-          p.innerHTML = `${text}<span class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
-          chat.appendChild(p);
-          Chat.UI.scrollToBottom();
-        },
-
-        scrollToBottom() {
-          requestAnimationFrame(() => {
-            Chat.elements.chat.scrollTop = Chat.elements.chat.scrollHeight;
-          });
-        },
-
-        updateShareLink() {
-          const shareLink = `${window.location.origin}?room=${encodeURIComponent(Chat.state.currentRoom)}`;
-          Chat.elements.shareLink.innerHTML = `
-            分享連結: <a href="${shareLink}" target="_blank">${shareLink}</a>
-            <button class="btn" onclick="Chat.share.copyLink()">複製</button>
-            <button class="btn" onclick="Chat.share.viaSMS()">透過 iMessages 分享</button>
-            ${navigator.share ? '<button class="btn" onclick="Chat.share.viaOther()">分享到其他</button>' : ''}
-            <button class="btn" id="leave-room" onclick="Chat.confirmLeave()">離開房間</button>
-            <button class="btn" id="close-room" onclick="Chat.confirmClose()">關閉房間</button>
-          `;
-        },
-
-        updateRoomStatus(userCount) {
-          Chat.elements.chatTitle.textContent = `voxa room (${userCount} 人線上)`;
-        },
-
-        showTyping(userId) {
-          Chat.elements.typingIndicator.textContent = `用戶 ${userId.slice(0, 6)} 正在輸入...`;
-          Chat.elements.typingIndicator.style.display = 'block';
-          clearTimeout(Chat.state.typingTimeout);
-          Chat.state.typingTimeout = setTimeout(() => {
-            Chat.elements.typingIndicator.style.display = 'none';
-          }, Chat.CONFIG.TYPING_TIMEOUT);
-        }
-      },
-
-      Socket: {
-        init() {
-          try {
-            Chat.state.socket = io('', {
-              timeout: Chat.CONFIG.CONNECT_TIMEOUT
-            });
-            Chat.Socket.bindEvents();
-          } catch (e) {
-            Chat.UI.showAlert('無法連線到伺服器，請稍後再試或聯繫管理員。');
-            console.error('Socket init error:', e);
-            Chat.Socket.retryConnect();
-          }
-        },
-
-        bindEvents() {
-          const { socket } = Chat.state;
-          socket.on('connect', () => {
-            console.log('Socket connected:', socket.id);
-            Chat.UI.showAlert('已連線到伺服器！', 'success');
-            Chat.state.connectRetries = 0;
-          });
-          socket.on('connect_error', (error) => {
-            console.error('Connect error:', error);
-            Chat.UI.showAlert('無法連線到伺服器，請稍後再試或聯繫管理員。');
-            const retryBtn = document.createElement('button');
-            retryBtn.textContent = '手動重試';
-            retryBtn.className = 'btn';
-            retryBtn.style.marginLeft = '10px';
-            retryBtn.onclick = () => Chat.Socket.retryConnect();
-            document.querySelector('.alert:last-child')?.appendChild(retryBtn);
-          });
-          socket.on('receive-message', ({ message, sender }) => Chat.Crypto.decryptMessage(message, sender));
-          socket.on('user-joined', userId => {
-            Chat.UI.appendMessage(`用戶 ${userId.slice(0, 6)} 加入`, 'system');
-            Chat.Socket.updateRoomStatus();
-          });
-          socket.on('user-left', userId => {
-            Chat.UI.appendMessage(`用戶 ${userId.slice(0, 6)} 離開`, 'system');
-            Chat.Socket.updateRoomStatus();
-          });
-          socket.on('room-terminated', () => {
-            Chat.UI.showAlert('房間已被終止！');
-            setTimeout(() => Chat.reset(), 500);
-          });
-          socket.on('typing', userId => Chat.UI.showTyping(userId));
-          socket.on('room-status', ({ userCount }) => Chat.UI.updateRoomStatus(userCount));
-          socket.on('error', (message) => Chat.UI.showAlert(message));
-        },
-
-        retryConnect() {
-          if (Chat.state.connectRetries >= Chat.CONFIG.MAX_RETRIES) {
-            Chat.UI.showAlert('連線重試失敗，請聯繫管理員或檢查網路。');
-            return;
-          }
-          Chat.state.connectRetries++;
-          console.log(`Retrying connection (${Chat.state.connectRetries}/${Chat.CONFIG.MAX_RETRIES})`);
-          setTimeout(() => {
-            try {
-              Chat.state.socket.connect();
-            } catch (e) {
-              console.error('Retry connect error:', e);
-              Chat.Socket.retryConnect();
-            }
-          }, 1000);
-        },
-
-        updateRoomStatus() {
-          if (Chat.state.currentRoom && Chat.state.socket.connected) {
-            Chat.state.socket.emit('get-room-status', Chat.state.currentRoom);
-          }
-        },
-
-        cleanup() {
-          if (Chat.state.currentRoom && Chat.state.socket.connected) {
-            Chat.state.socket.emit('leave-room', Chat.state.currentRoom);
-          }
-        }
-      },
-
-      Crypto: {
-        generateKey() {
-          try {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let key = '';
-            for (let i = 0; i < Chat.CONFIG.KEY_LENGTH; i++) {
-              key += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            Chat.elements.secretKey.value = key;
-            Chat.elements.secretKey.focus();
-            Chat.UI.showAlert('已生成隨機密鑰，請與對方共享！', 'success');
-          } catch (e) {
-            Chat.UI.showAlert('生成密鑰失敗，請稍後再試！');
-          }
-        },
-
-        encryptMessage(message) {
-          return CryptoJS.AES.encrypt(message, Chat.state.secretKey).toString();
-        },
-
-        decryptMessage(message, sender) {
-          try {
-            const decrypted = CryptoJS.AES.decrypt(message, Chat.state.secretKey).toString(CryptoJS.enc.Utf8);
-            if (!decrypted) {
-              Chat.UI.showAlert('無法解密訊息，請確認密鑰正確。');
-              return;
-            }
-            if (Chat.checkSensitiveContent(decrypted)) {
-              Chat.state.violationCount++;
-              if (Chat.state.violationCount === 1) {
-                Chat.UI.showAlert('警告：檢測到不當內容，請停止！再次違規將終止房間。');
-              } else {
-                Chat.UI.showAlert('第二次違規，房間已終止！');
-                Chat.state.socket.emit('terminate-room', Chat.state.currentRoom);
-                setTimeout(() => Chat.reset(), 500);
-              }
-              return;
-            }
-            Chat.UI.appendMessage(`對方: ${decrypted}`, 'other');
-          } catch (e) {
-            Chat.UI.showAlert('訊息解密失敗，請確認使用相同的密鑰。');
-          }
-        }
-      },
-
-      share: {
-        copyLink() {
-          const shareLink = `${window.location.origin}?room=${encodeURIComponent(Chat.state.currentRoom)}`;
-          navigator.clipboard.writeText(shareLink).then(() => {
-            Chat.UI.showAlert('連結已複製到剪貼簿！', 'success');
-          }).catch(() => {
-            Chat.UI.showAlert('複製失敗，請手動選取連結！');
-          });
-        },
-
-        viaSMS() {
-          const shareLink = `${window.location.origin}?room=${encodeURIComponent(Chat.state.currentRoom)}`;
-          const message = `加入 voxa 隱密聊天室：${shareLink}`;
-          window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
-        },
-
-        viaOther() {
-          const shareLink = `${window.location.origin}?room=${encodeURIComponent(Chat.state.currentRoom)}`;
-          navigator.share({
-            title: 'voxa 隱密聊天室',
-            text: '加入我的隱密聊天室！',
-            url: shareLink
-          }).then(() => {
-            Chat.UI.showAlert('分享成功！', 'success');
-          }).catch(() => {
-            Chat.UI.showAlert('分享失敗，請試試其他方式！');
-          });
-        }
-      },
-
-      joinRoom() {
-        console.log('joinRoom called');
-        try {
-          Chat.elements.joinRoomBtn.disabled = true;
-          Chat.elements.joinRoomBtn.textContent = '連線中...';
-          Chat.state.currentRoom = Chat.elements.roomId.value || Math.random().toString(36).slice(2, 2 + Chat.CONFIG.ROOM_ID_LENGTH);
-          Chat.state.secretKey = Chat.elements.secretKey.value.trim();
-          if (!Chat.state.secretKey) {
-            Chat.UI.showAlert('請輸入有效的加密密鑰！');
-            Chat.elements.secretKey.focus();
-            Chat.elements.joinRoomBtn.disabled = false;
-            Chat.elements.joinRoomBtn.textContent = '進入聊天';
-            return;
-          }
-          if (!Chat.state.socket.connected) {
-            Chat.UI.showAlert('無法連線到伺服器，請稍後再試或聯繫管理員。');
-            Chat.Socket.retryConnect();
-            Chat.elements.joinRoomBtn.disabled = false;
-            Chat.elements.joinRoomBtn.textContent = '進入聊天';
-            return;
-          }
-          Chat.state.socket.emit('join-room', Chat.state.currentRoom);
-          Chat.elements.chat.innerHTML = '';
-          Chat.UI.appendMessage(`已加入房間 ${Chat.state.currentRoom}`, 'system');
-          Chat.UI.hideModal();
-          Chat.UI.showChat();
-          Chat.UI.updateShareLink();
-          Chat.Socket.updateRoomStatus();
-        } catch (e) {
-          Chat.UI.showAlert('加入房間失敗，請確認後端已部署或稍後再試。');
-          console.error('joinRoom error:', e);
-        } finally {
-          setTimeout(() => {
-            Chat.elements.joinRoomBtn.disabled = false;
-            Chat.elements.joinRoomBtn.textContent = '進入聊天';
-          }, 3000);
-        }
-      },
-
-      sendMessage() {
-        const message = Chat.elements.message.value.trim();
-        if (!message || !Chat.state.currentRoom) return;
-        if (Chat.checkSensitiveContent(message)) {
-          Chat.state.violationCount++;
-          if (Chat.state.violationCount === 1) {
-            Chat.UI.showAlert('警告：檢測到不當內容，請停止！再次違規將終止房間。');
-          } else {
-            Chat.UI.showAlert('第二次違規，房間已終止！');
-            Chat.state.socket.emit('terminate-room', Chat.state.currentRoom);
-            setTimeout(() => Chat.reset(), 500);
-          }
-          return;
-        }
-        try {
-          const encrypted = Chat.Crypto.encryptMessage(message);
-          Chat.state.socket.emit('send-message', { roomId: Chat.state.currentRoom, message: encrypted });
-          Chat.UI.appendMessage(`你: ${message}`, 'you');
-          Chat.elements.message.value = '';
-          Chat.UI.scrollToBottom();
-        } catch (e) {
-          Chat.UI.showAlert('訊息加密失敗，請檢查密鑰或稍後再試。');
-        }
-      },
-
-      handleEvent(event, type) {
-        if (event.key === 'Enter') {
-          if (type === 'modal') {
-            Chat.joinRoom();
-          } else if (type === 'message') {
-            Chat.sendMessage();
-          }
-        }
-      },
-
-      handleTyping() {
-        if (Chat.state.currentRoom && Chat.state.socket.connected) {
-          Chat.state.socket.emit('typing', Chat.state.currentRoom);
-        }
-      },
-
-      confirmLeave() {
-        if (window.confirm('確定要離開房間？聊天記錄將不會保留。')) {
-          Chat.leaveRoom();
-        }
-      },
-
-      confirmClose() {
-        if (window.confirm('確定要關閉房間？所有用戶將被斷線，且記錄不會保留。')) {
-          Chat.closeRoom();
-        }
-      },
-
-      leaveRoom() {
-        if (!Chat.state.currentRoom) return;
-        if (Chat.state.socket.connected) {
-          Chat.state.socket.emit('leave-room', Chat.state.currentRoom);
-        }
-        Chat.reset();
-        Chat.UI.showAlert('你已離開房間', 'success');
-      },
-
-      closeRoom() {
-        if (!Chat.state.currentRoom) return;
-        if (Chat.state.socket.connected) {
-          Chat.state.socket.emit('terminate-room', Chat.state.currentRoom);
-        }
-        Chat.reset();
-        Chat.UI.showAlert('房間已關閉', 'success');
-      },
-
-      reset() {
-        Chat.state.currentRoom = '';
-        Chat.state.secretKey = '';
-        Chat.state.violationCount = 0;
-        Chat.elements.chat.innerHTML = '';
-        Chat.elements.shareLink.innerHTML = '';
-        Chat.elements.typingIndicator.style.display = 'none';
-        Chat.UI.hideChat();
-        Chat.elements.chatTitle.textContent = 'voxa room';
-        window.history.pushState({}, '', window.location.origin);
-      },
-
-      checkSensitiveContent(message) {
-        const lowerCase = message.toLowerCase();
-        return Chat.CONFIG.SENSITIVE_WORDS.some(word => lowerCase.includes(word));
-      }
-    };
-
-    Chat.init();
-  </script>
-</body>
-</html>
+         Chat.initSocket();
+       </script>
+     </body>
+     </html>
