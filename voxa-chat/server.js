@@ -105,7 +105,7 @@ io.on('connection', (socket) => {
         }
       });
       console.log('Client disconnected:', socket.id);
-    } rocker('Disconnect error:', e);
+    } console.log('Disconnect error:', e);
     }
   });
 });
