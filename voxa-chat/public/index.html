@@ -286,8 +286,8 @@
     </div>
   </section>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io@4.7.5/dist/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <script>
     const Chat = {
       CONFIG: {
@@ -327,6 +327,11 @@
       },
 
       init() {
+        if (typeof io === 'undefined') {
+          console.error('Socket.IO library not loaded');
+          Chat.UI.showAlert('無法載入 Socket.IO，請檢查網路或稍後再試');
+          return;
+        }
         this.cacheDomEvents();
         this.UI.init();
         this.Socket.init();
@@ -438,7 +443,12 @@
 
       Socket: {
         init() {
-          Chat.state.socket = io('https://voxa-chat.onrender.com', {
+          if (typeof io === 'undefined') {
+            console.error('Socket.IO library not loaded');
+            Chat.UI.showAlert('無法載入 Socket.IO，請檢查網路或稍後再試');
+            return;
+          }
+          Chat.state.socket = io('<YOUR_BACKEND_URL>', {
             timeout: Chat.CONFIG.CONNECT_TIMEOUT,
             reconnection: true,
             reconnectionAttempts: Chat.CONFIG.MAX_RETRIES,
@@ -453,10 +463,10 @@
 
           Chat.state.socket.on('connect_error', (error) => {
             console.error('Connect error:', error.message);
-            Chat.UI.showAlert('連線重試失敗，請聯繫管理員或檢查網路');
+            Chat.UI.showAlert('連線失敗，請檢查後端網址或網路');
             Chat.state.connectRetries++;
             if (Chat.state.connectRetries >= Chat.CONFIG.MAX_RETRIES) {
-              Chat.UI.showAlert('連線失敗，請檢查後端網址或網路');
+              Chat.UI.showAlert('多次連線失敗，請聯繫管理員');
             }
           });
 
@@ -593,8 +603,8 @@
             Chat.elements.joinRoomBtn.textContent = '進入聊天';
             return;
           }
-          if (!Chat.state.socket.connected) {
-            Chat.UI.showAlert('無法連線到伺服器，請稍後再試或聯繫管理員。');
+          if (!Chat.state.socket || !Chat.state.socket.connected) {
+            Chat.UI.showAlert('無法連線到伺服器，請確認後端網址或稍後再試。');
             Chat.elements.joinRoomBtn.disabled = false;
             Chat.elements.joinRoomBtn.textContent = '進入聊天';
             return;
@@ -616,8 +626,8 @@
             }
           });
         } catch (e) {
-          Chat.UI.showAlert('加入房間失敗，請確認後端已部署或稍後再試。');
           console.error('joinRoom error:', e);
+          Chat.UI.showAlert('加入房間失敗，請確認後端已部署或稍後再試。');
           Chat.elements.joinRoomBtn.disabled = false;
           Chat.elements.joinRoomBtn.textContent = '進入聊天';
         }
