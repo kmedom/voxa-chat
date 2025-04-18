@@ -438,7 +438,7 @@
 
       Socket: {
         init() {
-          Chat.state.socket = io('<https://voxa-chat.onrender.com>', {
+          Chat.state.socket = io('https://voxa-chat.onrender.com', {
             timeout: Chat.CONFIG.CONNECT_TIMEOUT,
             reconnection: true,
             reconnectionAttempts: Chat.CONFIG.MAX_RETRIES,
